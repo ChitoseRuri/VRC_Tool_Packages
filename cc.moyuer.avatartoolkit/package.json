@@ -1,0 +1,14 @@
+{
+  "name": "cc.moyuer.avatartoolkit",
+  "displayName": "Moyuer Avatar Toolkit",
+  "version": "2.1.2",
+  "description": "VRChat Avatar\u8f85\u52a9\u8bbe\u8ba1\u5de5\u5177\u7bb1",
+  "gitDependencies": {},
+  "vpmDependencies": {},
+  "legacyFolders": {},
+  "legacyFiles": {},
+  "localPath": "G:\\Documents\\Unity\\VRChat\\AvatarToolkit\\Packages\\cc.moyuer.vrcavatartoolkit",
+  "dependencies": {
+    "nadena.dev.modular-avatar":"file:../nadena.dev.modular-avatar"
+  }
+}
