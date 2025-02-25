@@ -9,6 +9,7 @@ using UnityEngine.SceneManagement;
 using VRC.PackageManagement.Core;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDK3.Dynamics.PhysBone.Components;
+using static VRChatAvatarToolkit.AvatarWardrobeParameter;
 using static VRChatAvatarToolkit.MoyuToolkitUtils;
 
 namespace VRChatAvatarToolkit
@@ -240,6 +241,11 @@ namespace VRChatAvatarToolkit
                         EditorGUILayout.PropertyField(clothObjectInfoProperty.FindPropertyRelative("showObjectList"), new GUIContent("衣服元素"));
                         EditorGUILayout.PropertyField(clothObjectInfoProperty.FindPropertyRelative("hideObjectList"), new GUIContent("额外隐藏"));
                         EditorGUILayout.PropertyField(clothObjectInfoProperty.FindPropertyRelative("blendShapePacks"), new GUIContent("身体参数"));
+                        if (GUILayout.Button("一键获取身体参数"))
+                        {
+                            GetCurBlendShape(index);
+                        }
+
                         // 样式嵌套End
                         EditorGUILayout.EndVertical();
                         GUILayout.Space(5);
@@ -262,6 +268,8 @@ namespace VRChatAvatarToolkit
             if (GUILayout.Button("删除所有的MASync"))
                 ClearBlendShapeBindings();
             GUILayout.EndHorizontal();
+            if (GUILayout.Button("重置形态"))
+                ResetBlendShape();
         }
         private void OnGUI_Ornament()
         {
@@ -406,6 +414,9 @@ namespace VRChatAvatarToolkit
             HashSet<string> customBlendShapeSet = new();
             foreach(var clothInfo in clothInfoList)
             {
+                if (clothInfo == null || clothInfo.blendShapePacks == null)
+                    continue;
+
                 foreach(var pack in clothInfo.blendShapePacks)
                 {
                     customBlendShapeSet.Add($"{pack.path}{SPLIT_CHAR}{pack.name}");
@@ -442,6 +453,47 @@ namespace VRChatAvatarToolkit
                     var pack = customV.Split(SPLIT_CHAR);
                     // 这里一定有两个元素
                     defaultBlendShapes.Add(new(pack[0], pack[1], 0));
+                }   
+            }
+        }
+
+        private void GetCurBlendShape(int index)
+        {
+            var clothInfo = clothInfoList[index];
+            clothInfo.blendShapePacks.Clear();
+
+            foreach (Transform t in avatar.transform)
+            {
+                SkinnedMeshRenderer renderer = t.GetComponent<SkinnedMeshRenderer>();
+                if (!renderer)
+                {
+                    continue;
+                }
+
+                for (int i = 0, max = renderer.sharedMesh.blendShapeCount; i < max; i++)
+                {
+                    float weight = renderer.GetBlendShapeWeight(i);
+                    if (weight > 0)
+                    {
+                        clothInfo.blendShapePacks.Add(new(t.gameObject.name, renderer.sharedMesh.GetBlendShapeName(i), weight));
+                    }
+                }
+            }
+        }
+
+        private void ResetBlendShape()
+        {
+            foreach (Transform t in avatar.transform)
+            {
+                SkinnedMeshRenderer renderer = t.GetComponent<SkinnedMeshRenderer>();
+                if (!renderer)
+                {
+                    continue;
+                }
+
+                for (int i = 0, max = renderer.sharedMesh.blendShapeCount; i < max; i++)
+                {
+                    renderer.SetBlendShapeWeight(i, 0);
                 }
             }
         }
