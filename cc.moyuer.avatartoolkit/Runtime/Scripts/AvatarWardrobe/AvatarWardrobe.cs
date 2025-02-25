@@ -394,6 +394,58 @@ namespace VRChatAvatarToolkit
             }
         }
 
+        private void DefaultBlendShapePreFix()
+        {
+            const string SPLIT_CHAR = "|";  // 随便挑一个不可能用来做名字的符号
+            HashSet<string> defaultBlendShapeSet = new();
+            foreach(var pack in defaultBlendShapes)
+            {
+                defaultBlendShapeSet.Add($"{pack.path}{SPLIT_CHAR}{pack.name}");
+            }
+
+            HashSet<string> customBlendShapeSet = new();
+            foreach(var clothInfo in clothInfoList)
+            {
+                foreach(var pack in clothInfo.blendShapePacks)
+                {
+                    customBlendShapeSet.Add($"{pack.path}{SPLIT_CHAR}{pack.name}");
+                }
+            }
+
+            List<string> delDefaultList = new();
+            foreach (var defaultV in defaultBlendShapeSet)
+            {
+                if (!customBlendShapeSet.Contains(defaultV))
+                {
+                    delDefaultList.Add(defaultV);
+                }
+            }
+
+            foreach(var defaultV in delDefaultList)
+            {
+                var pack = defaultV.Split(SPLIT_CHAR);
+                defaultBlendShapeSet.Remove(defaultV);
+                foreach (var defaultPack in defaultBlendShapes)
+                {
+                    if (defaultPack.path == pack[0] && defaultPack.name == pack[1])
+                    {
+                        defaultBlendShapes.Remove(defaultPack);
+                        break;
+                    }
+                }
+            }
+
+            foreach(var customV in customBlendShapeSet)
+            {
+                if (!defaultBlendShapeSet.Contains(customV))
+                {
+                    var pack = customV.Split(SPLIT_CHAR);
+                    // 这里一定有两个元素
+                    defaultBlendShapes.Add(new(pack[0], pack[1], 0));
+                }
+            }
+        }
+
         private void AutoFixAll()
         {
             AutoAddAllDynamicBones(); // 这个要放第一，收集所有动骨
@@ -932,6 +984,7 @@ namespace VRChatAvatarToolkit
             // 检测是否有修改
             if (EditorGUI.EndChangeCheck())
             {
+                DefaultBlendShapePreFix();
                 serializedObject.ApplyModifiedProperties();
                 WriteParameter();
             }
