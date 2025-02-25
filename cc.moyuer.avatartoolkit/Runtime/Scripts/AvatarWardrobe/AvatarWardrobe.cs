@@ -2,9 +2,11 @@
 using Codice.Client.BaseCommands;
 using nadena.dev.modular_avatar.core;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using VRC.PackageManagement.Core;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDK3.Dynamics.PhysBone.Components;
 using static VRChatAvatarToolkit.MoyuToolkitUtils;
@@ -21,10 +23,11 @@ namespace VRChatAvatarToolkit
         private AvatarWardrobeParameter parameter;
         private string avatarId;
 
+        public List<AvatarWardrobeParameter.BlendShapePack> defaultBlendShapes = new List<AvatarWardrobeParameter.BlendShapePack>();
         // 衣服
         public List<ClothObjInfo> clothInfoList = new List<ClothObjInfo>();
         private int defaultClothIndex = -1;
-
+        private bool bClearOldBlendShapeBinding = false;
         // 配饰
         public List<OrnamentObjInfo> ornamentInfoList = new List<OrnamentObjInfo>();
 
@@ -90,18 +93,22 @@ namespace VRChatAvatarToolkit
                 GUILayout.Space(10);
                 EditorGUILayout.HelpBox("请先选择一个模型", MessageType.Info);
             }
+           
             GUILayout.Space(10);
             if (parameter == null && GUILayout.Button("创建衣柜"))
             {
                 parameter = CreateAvatarWardrobeParameter(avatar);
                 ReadParameter();
             }
-            else if (avatar != null && parameter != null)
+            else if (avatar && parameter)
             {
                 tabIndex = GUILayout.Toolbar(tabIndex, new[] { "衣服", "配饰" });
                 GUILayout.Space(5);
                 if (tabIndex == 0)
+                {
+                    OnGUI_DefaultValue();
                     OnGUI_Cloth();
+                }
                 else
                     OnGUI_Ornament();
                 GUILayout.Space(5);
@@ -113,14 +120,25 @@ namespace VRChatAvatarToolkit
                 GUILayout.BeginHorizontal();
 
                 if (GUILayout.Button("一键应用到模型"))
-                    ApplyToAvatar(avatar, clothInfoList, defaultClothIndex, ornamentInfoList);
+                    ApplyToAvatar(avatar, defaultBlendShapes, clothInfoList, defaultClothIndex, ornamentInfoList);
 
                 GUILayout.EndHorizontal();
                 GUILayout.Space(10);
             }
         }
+
+        private void OnGUI_DefaultValue()
+        {
+            GUILayout.Label("BlendShape默认值");
+            serializedObject.Update();
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("defaultBlendShapes"), new GUIContent("BlendShape默认值"));
+            CheckAndSave();
+        }
+
         private void OnGUI_Cloth()
         {
+            GUILayout.Label("衣柜");
             scrollPos = GUILayout.BeginScrollView(scrollPos);
             var sum = clothInfoList.Count;
             if (sum == 0)
@@ -158,7 +176,7 @@ namespace VRChatAvatarToolkit
                         GUILayout.Space(15);
                         EditorGUILayout.BeginVertical();
 
-                        // 内容
+                        //sd内容
                         EditorGUILayout.BeginHorizontal();
                         info.image = (Texture2D)EditorGUILayout.ObjectField("", info.image, typeof(Texture2D), true, GUILayout.Width(60), GUILayout.Height(60));
                         GUILayout.Space(5);
@@ -193,7 +211,7 @@ namespace VRChatAvatarToolkit
                         if (GUILayout.Button("预览", GUILayout.Width(60)))
                         {
                             defaultClothIndex = index;
-                            PrviewCloth(clothInfoList, index);
+                            PrviewCloth(avatar, clothInfoList, defaultBlendShapes, index);
                             break;
                         }
 
@@ -222,7 +240,6 @@ namespace VRChatAvatarToolkit
                         EditorGUILayout.PropertyField(clothObjectInfoProperty.FindPropertyRelative("showObjectList"), new GUIContent("衣服元素"));
                         EditorGUILayout.PropertyField(clothObjectInfoProperty.FindPropertyRelative("hideObjectList"), new GUIContent("额外隐藏"));
                         EditorGUILayout.PropertyField(clothObjectInfoProperty.FindPropertyRelative("blendShapePacks"), new GUIContent("身体参数"));
-                        EditorGUILayout.PropertyField(clothObjectInfoProperty.FindPropertyRelative("footHeelHigh"), new GUIContent("鞋跟高度"));
                         // 样式嵌套End
                         EditorGUILayout.EndVertical();
                         GUILayout.Space(5);
@@ -239,8 +256,12 @@ namespace VRChatAvatarToolkit
             if (CanAdd() && GUILayout.Button("添加衣服"))
                 AddCloth();
 
+            GUILayout.BeginHorizontal();
             if (GUILayout.Button("根据衣服自动添加MASync和动骨"))
                 AutoFixAll();
+            if (GUILayout.Button("删除所有的MASync"))
+                ClearBlendShapeBindings();
+            GUILayout.EndHorizontal();
         }
         private void OnGUI_Ornament()
         {
@@ -347,12 +368,9 @@ namespace VRChatAvatarToolkit
                     EditorGUILayout.EndFadeGroup();
                 }
                 // 检测是否有修改
-                if (EditorGUI.EndChangeCheck())
-                {
-                    serializedObject.ApplyModifiedProperties();
-                    WriteParameter();
-                }
+                CheckAndSave();
             }
+
             GUILayout.EndScrollView();
             if (CanAdd() && GUILayout.Button("添加配饰"))
                 AddOrnament();
@@ -360,6 +378,20 @@ namespace VRChatAvatarToolkit
         private bool CanAdd()
         {
             return (clothInfoList.Count + ornamentInfoList.Count) < maxClothNum;
+        }
+
+        private void ClearBlendShapeBindings()
+        {
+            if (!EditorUtility.DisplayDialog("真的要删除所有衣服的MABlendShapeSync吗？", "一般而言，这个按钮只应该在配置错误时使用", "确认", "取消"))
+                return;
+
+            foreach (var clothInfo in clothInfoList)
+            {
+                foreach(var ma in clothInfo.showObjectList[0].GetComponentsInChildren<ModularAvatarBlendshapeSync>())
+                {
+                    DestroyImmediate(ma);
+                }
+            }
         }
 
         private void AutoFixAll()
@@ -491,13 +523,27 @@ namespace VRChatAvatarToolkit
 
         private void AutoFixMABlendShapeSync()
         {
-            GameObject body = FindObjectByNameRecursive(avatar.transform, AVATAR_BODY_NAME);
-            var bodyMeshRender = body.GetComponent<SkinnedMeshRenderer>();
             // 建立body的名字映射
-            Dictionary<string, int> bodyBlendShapeNameMap = new Dictionary<string, int>();
-            for (int i = 0; i < bodyMeshRender.sharedMesh.blendShapeCount; i++)
+            Dictionary<GameObject, Dictionary<string, int>> bodyMeshRenderMap = new();
+            Dictionary<GameObject, Dictionary<string, int>> bodyMeshCheckNameSetMap = new();
+            foreach (Transform t in avatar.transform)
             {
-                bodyBlendShapeNameMap[bodyMeshRender.sharedMesh.GetBlendShapeName(i)] = i;
+                var bodyMeshRender = t.GetComponent<SkinnedMeshRenderer>();
+                if (bodyMeshRender && bodyMeshRender.sharedMesh.blendShapeCount > 0)
+                {
+                    Dictionary<string, int> bodyBlendShapeNameMap = new();
+                    bodyMeshRenderMap[bodyMeshRender.gameObject] = bodyBlendShapeNameMap;
+
+                    Dictionary<string, int> checkNameSet = new();
+                    bodyMeshCheckNameSetMap[bodyMeshRender.gameObject] = checkNameSet;
+
+                    for (int i = 0; i < bodyMeshRender.sharedMesh.blendShapeCount; i++)
+                    {
+                        var blendShapeName = bodyMeshRender.sharedMesh.GetBlendShapeName(i);
+                        bodyBlendShapeNameMap[blendShapeName] = i;
+                        checkNameSet[blendShapeName.ToLower()] = i;
+                    }
+                }
             }
 
             foreach (var clothInfo in clothInfoList)
@@ -514,30 +560,33 @@ namespace VRChatAvatarToolkit
                     // 跳过已经生成了的
                     if (maShapeSync)
                     {
-                        continue;
+                        //continue;
                     }
                     else
                     {
                         maShapeSync = clothMeshRender.gameObject.AddComponent<ModularAvatarBlendshapeSync>();
                     }
-                        
+
 
                     if (maShapeSync.Bindings == null)
                     {
                         maShapeSync.Bindings = new List<BlendshapeBinding>();
                     }
-                    else
+
+                    HashSet<string> existBindings = new HashSet<string>();
+                    foreach (var blendShape in  maShapeSync.Bindings)
                     {
-                        maShapeSync.Bindings.Clear();
+                        existBindings.Add(blendShape.Blendshape);
                     }
-                    
+
                     // 生成cloth的名字映射
                     Dictionary<string, int> clothBlendShapeNameMap = new Dictionary<string, int>();
                     for (int i = 0; i < clothMeshRender.sharedMesh.blendShapeCount; ++i)
                     {
-                        clothBlendShapeNameMap[clothMeshRender.sharedMesh.GetBlendShapeName(i)] = i;
+                        var blendShapeName = clothMeshRender.sharedMesh.GetBlendShapeName(i);
+                        clothBlendShapeNameMap[blendShapeName] = i;
                     }
-                    
+
                     if (clothBlendShapeNameMap.Count == 0)
                     {
                         DestroyImmediate(maShapeSync);
@@ -546,21 +595,19 @@ namespace VRChatAvatarToolkit
 
                     foreach (var clothShapeNamePair in clothBlendShapeNameMap)
                     {
-                        if (bodyBlendShapeNameMap.ContainsKey(clothShapeNamePair.Key))
+                        string checkName = clothShapeNamePair.Key.ToLower();
+                        foreach (var pair in bodyMeshRenderMap)
                         {
-                            //BlendshapeBinding clothBinding = new BlendshapeBinding();
-                            //clothBinding.Blendshape = clothShapeNamePair.Key;
-                            //clothBinding.LocalBlendshape = clothShapeNamePair.Key;
-                            //clothBinding.ReferenceMesh = new AvatarObjectReference();
-                            //clothBinding.ReferenceMesh.Set(clothMeshRender.gameObject);
-                            //maShapeSync.Bindings.Add(clothBinding);
-
-                            BlendshapeBinding bodyBinding = new BlendshapeBinding();
-                            bodyBinding.Blendshape = clothShapeNamePair.Key;
-                            bodyBinding.LocalBlendshape = clothShapeNamePair.Key;
-                            bodyBinding.ReferenceMesh = new AvatarObjectReference();
-                            bodyBinding.ReferenceMesh.Set(bodyMeshRender.gameObject);
-                            maShapeSync.Bindings.Add(bodyBinding);
+                            if (bodyMeshCheckNameSetMap[pair.Key].ContainsKey(checkName) && !existBindings.Contains(clothShapeNamePair.Key))
+                            {
+                                existBindings.Add(clothShapeNamePair.Key);
+                                BlendshapeBinding bodyBinding = new BlendshapeBinding();
+                                bodyBinding.Blendshape = pair.Value.FindFirstKeyByValue(bodyMeshCheckNameSetMap[pair.Key][checkName]);
+                                bodyBinding.LocalBlendshape = clothShapeNamePair.Key;
+                                bodyBinding.ReferenceMesh = new AvatarObjectReference();
+                                bodyBinding.ReferenceMesh.Set(pair.Key);
+                                maShapeSync.Bindings.Add(bodyBinding);
+                            }
                         }
                     }
 
@@ -664,7 +711,7 @@ namespace VRChatAvatarToolkit
                     defaultClothIndex = 1;
                 else
                     defaultClothIndex = -1;
-                PrviewCloth(clothInfoList, defaultClothIndex);
+                PrviewCloth(avatar, clothInfoList, defaultBlendShapes, defaultClothIndex);
             }
             clothInfoList.RemoveAt(index);
             WriteParameter();
@@ -696,8 +743,11 @@ namespace VRChatAvatarToolkit
             defaultClothIndex = -1;
             clothInfoList.Clear();
             ornamentInfoList.Clear();
+            defaultBlendShapes.Clear();
             if (parameter == null)
                 return;
+
+            defaultBlendShapes = parameter.defaultBlendShapes;
             foreach (var info in parameter.clothList)
             {
                 var clothObjectInfo = new ClothObjInfo
@@ -705,24 +755,8 @@ namespace VRChatAvatarToolkit
                     name = info.name,
                     image = info.menuImage,
                     type = info.type ?? "",
-                    footHeelHigh = info.footHeelHigh,
                     blendShapePacks = info.blendShapePacks,
                 };
-
-                // 创建检查map
-                Dictionary<string, float> blendShapeMap = new();
-                foreach (var blendShapePack in clothObjectInfo.blendShapePacks)
-                {
-                    blendShapeMap[blendShapePack.name] = blendShapePack.value;
-                }
-
-                foreach (var defaultValue in AvatarWardrobeParameter.BlendShapePacksDefault)
-                {
-                    if (!blendShapeMap.ContainsKey(defaultValue.Key))
-                    {
-                        clothObjectInfo.blendShapePacks.Add(new(defaultValue.Key, defaultValue.Value));
-                    }
-                }
 
                 clothObjectInfo.blendShapePacks.Sort((l, r) =>
                 {
@@ -771,7 +805,7 @@ namespace VRChatAvatarToolkit
             if (avatar == null || parameter == null)
                 return;
             var parentPath = avatar.transform.GetHierarchyPath() + "/";
-
+            parameter.defaultBlendShapes = defaultBlendShapes;
             // 检查冲突项
             // 如果元素不在模型范围内则移除
             // 如果元素属于某件衣服，则不允许添加进其他衣服的隐藏元素
@@ -852,7 +886,6 @@ namespace VRChatAvatarToolkit
                             clothInfo.hidePaths.Add(path);
                     }
                 }
-                clothInfo.footHeelHigh = info.footHeelHigh;
                 clothInfo.blendShapePacks = info.blendShapePacks;
                 clothList.Add(clothInfo);
             }

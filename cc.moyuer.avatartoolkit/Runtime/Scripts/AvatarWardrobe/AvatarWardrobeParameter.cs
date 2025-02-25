@@ -6,6 +6,8 @@ namespace VRChatAvatarToolkit {
     public class AvatarWardrobeParameter : ScriptableObject {
         internal string avatarId; // 绑定模型ID
         public int defaultClothIndex; // 默认衣服
+        public string avatarBodyName; // 体形形态的位置
+        public List<BlendShapePack> defaultBlendShapes = new List<BlendShapePack>();
         public List<ClothInfo> clothList = new List<ClothInfo>(); // 衣服列表
         public List<OrnamentInfo> ornamentList = new List<OrnamentInfo>(); // 配饰列表
 
@@ -17,12 +19,14 @@ namespace VRChatAvatarToolkit {
                 
             }
 
-            public BlendShapePack(string name, float value)
+            public BlendShapePack(string path, string name, float value)
             {
+                this.path = path;
                 this.name = name;
                 this.value = value;
             }
 
+            public string path;
             public string name;
             public float value;
         }
@@ -30,7 +34,7 @@ namespace VRChatAvatarToolkit {
         public static Dictionary<string, float> BlendShapePacksDefault = new Dictionary<string, float>
         {
             { "Foot_heel_high", 0 },
-            {"Shrink_Foot", 0 },
+            { "Shrink_Foot", 0 },
         };
 
     [System.Serializable]
@@ -41,7 +45,6 @@ namespace VRChatAvatarToolkit {
             public List<string> showPaths = new List<string>(); //显示元素
             public List<string> hidePaths = new List<string>(); //隐藏元素
             public List<BlendShapePack> blendShapePacks = new List<BlendShapePack>();
-            public float footHeelHigh;
         }
 
         [System.Serializable]

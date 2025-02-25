@@ -14,9 +14,6 @@ namespace VRChatAvatarToolkit
 {
     public class AvatarWardrobeUtils : EditorWindow
     {
-        public const string AVATAR_NAME = "ManukaFT";
-        public const string AVATAR_BODY_NAME = "Manuka_body";
-
         internal const int maxClothNum = 255;
 
         [System.Serializable]
@@ -33,7 +30,6 @@ namespace VRChatAvatarToolkit
         {
             public List<GameObject> showObjectList, hideObjectList;
             public List<AvatarWardrobeParameter.BlendShapePack> blendShapePacks;
-            public float footHeelHigh;
 
             public ClothObjInfo(string _name = "新衣服")
             {
@@ -171,9 +167,27 @@ namespace VRChatAvatarToolkit
             return pathMap;
         }
 
+        internal static GameObject FindByPath(GameObject root, string path, char separator = '.')
+        {
+            if (root == null || string.IsNullOrEmpty(path))
+                return null;
+
+            Transform current = root.transform;
+            string[] names = path.Split(separator);
+
+            foreach (string name in names)
+            {
+                current = current.Find(name);
+                if (current == null)
+                    return null; // 路径不存在时返回 null
+            }
+
+            return current.gameObject;
+        }
+
 
         // 预览衣服
-        internal static void PrviewCloth(List<ClothObjInfo> clothInfoList, int index)
+        internal static void PrviewCloth(GameObject avatar, List<ClothObjInfo> clothInfoList, List<AvatarWardrobeParameter.BlendShapePack> defaultBlendShapes, int index)
         {
             if (index < 0 || index > clothInfoList.Count)
                 return;
@@ -188,9 +202,68 @@ namespace VRChatAvatarToolkit
             foreach (var item in showList)
                 if (item != null)
                     item.SetActive(true);
+
+            // 更新形态
+            List<AvatarWardrobeParameter.BlendShapePack> blendShapePacks = new();
+            foreach (var pack in clothInfoList[index].blendShapePacks)
+            {
+                blendShapePacks.Add(pack);
+            }
+
+            foreach (var pack in defaultBlendShapes)
+            {
+                bool needDefaultValue = true;
+                foreach (var customPack in blendShapePacks)
+                {
+                    if (pack.path == customPack.path && pack.name == customPack.name)
+                    {
+                        needDefaultValue = false;
+                        break;
+                    }
+                }
+
+                if (needDefaultValue)
+                {
+                    blendShapePacks.Add(pack);
+                }
+            }
+
+            Dictionary<string, SkinnedMeshRenderer> rendererMap = new();
+            foreach(var blendShape in blendShapePacks)
+            {
+                if (!rendererMap.ContainsKey(blendShape.path))
+                {
+                    GameObject obj = FindByPath(avatar, blendShape.path);
+                    if (obj)
+                    {
+                        var newRenderer = obj.GetComponent<SkinnedMeshRenderer>();
+                        if (newRenderer)
+                        {
+                            rendererMap[blendShape.path] = newRenderer;
+                        }
+                    }
+                }
+
+                if (!rendererMap.ContainsKey(blendShape.path))
+                {
+                    Debug.Log($"错误的blendShape路径配置:{blendShape.path}");
+                    continue;
+                }
+
+                var renderer = rendererMap[blendShape.path];
+                var sharedMesh = renderer.sharedMesh;
+                for (int i = 0, max = sharedMesh.blendShapeCount; i < max; i++)
+                {
+                    if (sharedMesh.GetBlendShapeName(i) == blendShape.name)
+                    {
+                        renderer.SetBlendShapeWeight(i, blendShape.value);
+                    }
+                }
+            }
         }
+
         // 获取换装动画
-        internal static AnimationClip GetClothAnimClip(List<ClothObjInfo> clothInfoList, GameObject avatar, int index)
+        internal static AnimationClip GetClothAnimClip(List<ClothObjInfo> clothInfoList, List<AvatarWardrobeParameter.BlendShapePack> defaultBlendShapes, GameObject avatar, int index)
         {
             var clip = new AnimationClip { name = clothInfoList[index].name };
             var map = GetClothPathParameter(avatar, clothInfoList, index);
@@ -221,30 +294,47 @@ namespace VRChatAvatarToolkit
                 AnimationUtility.SetEditorCurve(clip, bind, curve);
             }
 
-            // 添加blendshape控制
+            // 添加blendshape自定义
+            foreach (var blendShapePack in clothInfoList[index].blendShapePacks)
             {
-                foreach (var blendShapePack in clothInfoList[index].blendShapePacks)
+                var frame = new Keyframe { time = 0, value = blendShapePack.value };
+                var curve = new AnimationCurve { keys = new Keyframe[] { frame } };
+                EditorCurveBinding bind = new EditorCurveBinding
+                {
+                    path = blendShapePack.path,
+                    propertyName = $"blendShape.{blendShapePack.name}",
+                    type = typeof(SkinnedMeshRenderer)
+                };
+                AnimationUtility.SetEditorCurve(clip, bind, curve);
+            }
+            // 添加blendshape默认值
+            foreach (var blendShapePack in defaultBlendShapes)
+            {
+                bool needDefaultValue = true;
+                // 检查默认值是否有被自定义
+                foreach (var customBlendShapePack in clothInfoList[index].blendShapePacks)
+                {
+                    if (blendShapePack.path == customBlendShapePack.path && blendShapePack.name == customBlendShapePack.name)
+                    {
+                        needDefaultValue = false;
+                        break;
+                    }
+                }
+
+                if (needDefaultValue)
                 {
                     var frame = new Keyframe { time = 0, value = blendShapePack.value };
                     var curve = new AnimationCurve { keys = new Keyframe[] { frame } };
                     EditorCurveBinding bind = new EditorCurveBinding
                     {
-                        path = AVATAR_BODY_NAME,
+                        path = blendShapePack.path,
                         propertyName = $"blendShape.{blendShapePack.name}",
                         type = typeof(SkinnedMeshRenderer)
                     };
                     AnimationUtility.SetEditorCurve(clip, bind, curve);
                 }
-                //var frame = new Keyframe { time = 0, value = clothInfoList[index].footHeelHigh };
-                //var curve = new AnimationCurve { keys = new Keyframe[] { frame } };
-                //EditorCurveBinding bind = new EditorCurveBinding
-                //{
-                //    path = AVATAR_BODY_NAME,
-                //    propertyName = "blendShape.Foot_heel_high",
-                //    type = typeof(SkinnedMeshRenderer)
-                //};  
-                //AnimationUtility.SetEditorCurve(clip, bind, curve);
             }
+ 
             return clip;
         }
         // 获取配饰开关动画
@@ -288,7 +378,8 @@ namespace VRChatAvatarToolkit
             return clipList;
         }
         // 一键应用到模型
-        internal static void ApplyToAvatar(GameObject avatar, List<ClothObjInfo> clothInfoList, int defaultClothIndex, List<OrnamentObjInfo> ornamentInfoList)
+        internal static void ApplyToAvatar(GameObject avatar, List<AvatarWardrobeParameter.BlendShapePack> defaultBlendShapes,
+            List<ClothObjInfo> clothInfoList, int defaultClothIndex, List<OrnamentObjInfo> ornamentInfoList)
         {
             ClearConsole();
             var avatarId = GetAvatarId(avatar);
@@ -605,7 +696,7 @@ namespace VRChatAvatarToolkit
             var clothAnimClipList = new List<AnimationClip>();
             for (var index = 0; index < clothInfoList.Count; index++)
             {
-                var clip = GetClothAnimClip(clothInfoList, avatar, index);
+                var clip = GetClothAnimClip(clothInfoList, defaultBlendShapes, avatar, index);
                 clothAnimClipList.Add(clip);
                 AssetDatabase.CreateAsset(clip, animDir + "Cloth_" + clothInfoList[index].name + ".anim");
             }
