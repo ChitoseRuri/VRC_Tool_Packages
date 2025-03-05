@@ -9,6 +9,7 @@ using System.IO;
 using UnityEditor.Animations;
 using System;
 using static VRChatAvatarToolkit.MoyuToolkitUtils;
+using static VRChatAvatarToolkit.AvatarWardrobeParameter;
 
 namespace VRChatAvatarToolkit
 {
@@ -29,7 +30,7 @@ namespace VRChatAvatarToolkit
         public class ClothObjInfo : ObjInfo
         {
             public List<GameObject> showObjectList, hideObjectList;
-            public List<AvatarWardrobeParameter.BlendShapePack> blendShapePacks;
+            public List<BlendShapePack> blendShapePacks;
 
             public ClothObjInfo(string _name = "新衣服")
             {
@@ -38,6 +39,7 @@ namespace VRChatAvatarToolkit
                 hideObjectList = new List<GameObject>();
             }
         }
+
         [System.Serializable]
         public class OrnamentObjInfo : ObjInfo
         {
@@ -49,6 +51,32 @@ namespace VRChatAvatarToolkit
                 name = _name;
                 isShow = true;
                 objectList = new List<GameObject>();
+            }
+        }
+
+        [System.Serializable]
+        public class ExclusionObjInfo : ObjInfo
+        {
+            public List<GameObject> objectList;
+
+            public ExclusionObjInfo(string _name = "新配饰")
+            {
+                name = _name;
+                objectList = new List<GameObject>();
+            }
+        }
+
+        [System.Serializable]
+        public class MutualExclusionObjInfo: ObjInfo
+        {
+            public List<ExclusionObjInfo> mutualExclusions;
+            public uint defaultIndex;
+
+            public MutualExclusionObjInfo(string _name = "新互斥组")
+            {
+                name = _name;
+                defaultIndex = 0;
+                mutualExclusions = new List<ExclusionObjInfo>();
             }
         }
 
