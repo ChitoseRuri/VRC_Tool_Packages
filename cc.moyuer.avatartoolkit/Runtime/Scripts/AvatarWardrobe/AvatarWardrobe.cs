@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR && VRC_SDK_VRCSDK3
+#if UNITY_EDITOR && VRC_SDK_VRCSDK3
 using Codice.Client.BaseCommands;
 using nadena.dev.modular_avatar.core;
 using System;
@@ -404,25 +404,25 @@ namespace VRChatAvatarToolkit
 
             for (int index = 0, max = mutualExclusionList.Count; index < max; ++index)
             {
-                var info = mutualExclusionList[index];
-                var clothName = info.name + (defaultClothIndex == index ? "（默认）" : "");
-                var newTarget = EditorGUILayout.Foldout(info.animBool.target, clothName, true);
-                if (newTarget != info.animBool.target)
+                var mutualExclusionGroup = mutualExclusionList[index];
+                var clothName = mutualExclusionGroup.name;
+                var newTarget = EditorGUILayout.Foldout(mutualExclusionGroup.animBool.target, clothName, true);
+                if (newTarget != mutualExclusionGroup.animBool.target)
                 {
                     if (newTarget)
                         foreach (var _info in clothInfoList)
                             _info.animBool.target = false;
-                    info.animBool.target = newTarget;
+                    mutualExclusionGroup.animBool.target = newTarget;
                 }
 
-                if (EditorGUILayout.BeginFadeGroup(info.animBool.faded))
+                if (EditorGUILayout.BeginFadeGroup(mutualExclusionGroup.animBool.faded))
                 { 
                     var mutualExclusionListProperty = serializedObject.FindProperty("mutualExclusionList").GetArrayElementAtIndex(index);
 
                     // 互斥组信息显示
                     EditorGUILayout.BeginHorizontal();
 
-                    info.image = (Texture2D)EditorGUILayout.ObjectField("", info.image, typeof(Texture2D), true, GUILayout.Width(60), GUILayout.Height(60));
+                    mutualExclusionGroup.image = (Texture2D)EditorGUILayout.ObjectField("", mutualExclusionGroup.image, typeof(Texture2D), true, GUILayout.Width(60), GUILayout.Height(60));
                     GUILayout.Space(5);
 
                     EditorGUILayout.BeginVertical();
@@ -448,77 +448,84 @@ namespace VRChatAvatarToolkit
 
                     EditorGUILayout.EndHorizontal();
 
-                    var mutualExclusionGroup = mutualExclusionList[index];
                     EditorGUILayout.PropertyField(mutualExclusionListProperty.FindPropertyRelative("name"), new GUIContent(""));
-                    if (GUILayout.Button("新增互斥元素"))
+                    var exclusionList = mutualExclusionGroup.mutualExclusions;
+                    if (GUILayout.Button("新增互斥饰品"))
                     {
-                        mutualExclusionGroup.mutualExclusions.Add(new());
+                        AddListData(ref exclusionList);
                     }
 
-                    EditorGUILayout.EndVertical();
-
-                    EditorGUILayout.EndHorizontal();
-
-                    // 显示互斥组里面的元素
+                    // 显示互斥饰品里面的具体Object
                     EditorGUILayout.BeginHorizontal();
 
                     GUILayout.Space(5);
 
                     EditorGUILayout.BeginVertical();
 
-                    EditorGUILayout.PropertyField(mutualExclusionListProperty.FindPropertyRelative("mutualExclusions"), new GUIContent("互斥列表"));
+                    var mutualExclusions = mutualExclusionListProperty.FindPropertyRelative("mutualExclusions");
+                    for (int mutalIndex = 0, count = exclusionList.Count; mutalIndex < count; ++mutalIndex)
+                    {
+                        var mutualExclusion = mutualExclusions.GetArrayElementAtIndex(mutalIndex);
+                        var mutualInfo = exclusionList[mutalIndex];
+
+                        //EditorGUILayout.BeginHorizontal();
+
+                        //GUILayout.Space(5);
+
+                        //EditorGUILayout.BeginVertical();
+
+                        //EditorGUILayout.PropertyField(mutualExclusion.FindPropertyRelative("name"), new GUIContent("名称"));
+                        //EditorGUILayout.PropertyField(mutualExclusion.FindPropertyRelative("objectList"), new GUIContent("物品列表"));
+
+                        //EditorGUILayout.EndVertical();
+
+                        //EditorGUILayout.EndHorizontal();
+
+                        // 互斥组信息显示
+                        EditorGUILayout.BeginHorizontal();
+
+                        mutualInfo.image = (Texture2D)EditorGUILayout.ObjectField("", mutualInfo.image, typeof(Texture2D), true, GUILayout.Width(40), GUILayout.Height(40));
+                        GUILayout.Space(5);
+
+                        EditorGUILayout.BeginVertical();
+
+                        EditorGUILayout.BeginHorizontal();
+
+                        GUILayout.FlexibleSpace();
+                        if (mutalIndex > 0 && GUILayout.Button("上移", GUILayout.Width(60)))
+                        {
+                            MoveListItem(ref exclusionList, mutalIndex, mutalIndex - 1);
+                            break;
+                        }
+                        else if (mutalIndex < exclusionList.Count - 1 && GUILayout.Button("下移", GUILayout.Width(60)))
+                        {
+                            MoveListItem(ref exclusionList, mutalIndex, mutalIndex + 1);
+                            break;
+                        }
+                        if (GUILayout.Button("删除", GUILayout.Width(60)))
+                        {
+                            DelListData(ref exclusionList, mutalIndex, "真的要删除这个互斥饰品吗？");
+                            break;
+                        }
+
+                        EditorGUILayout.EndHorizontal();
+
+                        EditorGUILayout.PropertyField(mutualExclusion.FindPropertyRelative("name"), new GUIContent(""));
+
+
+                        EditorGUILayout.PropertyField(mutualExclusion.FindPropertyRelative("objectList"), new GUIContent($"物品列表：{mutualInfo.name}"));
+                        EditorGUILayout.EndVertical();
+
+                        EditorGUILayout.EndHorizontal();
+                    }
 
                     EditorGUILayout.EndVertical();
 
                     EditorGUILayout.EndHorizontal();
 
-                    //var mutualExclusions = mutualExclusionListProperty.FindPropertyRelative("mutualExclusions");
-                    //for (int mutalIndex = 0, count = mutualExclusionGroup.mutualExclusions.Count; mutalIndex < count; ++mutalIndex)
-                    //{
-                    //    var mutualExclusion = mutualExclusions.GetArrayElementAtIndex(mutalIndex);
-                    //    var mutualInfo = mutualExclusionGroup.mutualExclusions[mutalIndex];
+                    EditorGUILayout.EndVertical();
 
-                    //    // 样式嵌套Start
-                    //    EditorGUILayout.BeginHorizontal();
-
-                    //    mutualInfo.menuImage = (Texture2D)EditorGUILayout.ObjectField("", mutualInfo.menuImage, typeof(Texture2D), true, GUILayout.Width(60), GUILayout.Height(60));
-                    //    GUILayout.Space(5);
-
-                    //    EditorGUILayout.BeginVertical();
-
-                    //    EditorGUILayout.BeginHorizontal();
-
-                    //    GUILayout.FlexibleSpace();
-                    //    if (index > 0 && GUILayout.Button("上移", GUILayout.Width(60)))
-                    //    {
-                    //        MoveListItem(ref mutualExclusionGroup.mutualExclusions, index, index - 1);
-                    //        break;
-                    //    }
-                    //    else if (index < mutualExclusionGroup.mutualExclusions.Count - 1 && GUILayout.Button("下移", GUILayout.Width(60)))
-                    //    {
-                    //        MoveListItem(ref mutualExclusionGroup.mutualExclusions, index, index + 1);
-                    //        break;
-                    //    }
-                    //    if (GUILayout.Button("删除", GUILayout.Width(60)))
-                    //    {
-                    //        DelListData(ref mutualExclusionGroup.mutualExclusions, index, "真的要删除这件配饰吗？");
-                    //        break;
-                    //    }
-
-                    //    EditorGUILayout.EndVertical();
-
-                    //    EditorGUILayout.EndHorizontal();
-
-                    //    EditorGUILayout.EndHorizontal();
-
-                    //    EditorGUILayout.LabelField("饰品名称");
-                    //    EditorGUILayout.PropertyField(mutualExclusion.FindPropertyRelative("name"), new GUIContent(""));
-
-                    //    EditorGUILayout.EndVertical();
-
-                    //    EditorGUILayout.EndHorizontal();
-                    //}
-
+                    EditorGUILayout.EndHorizontal();
                 }
                 EditorGUILayout.EndFadeGroup();
             }
@@ -526,7 +533,7 @@ namespace VRChatAvatarToolkit
 
             if (GUILayout.Button("添加互斥饰品组"))
             {
-                mutualExclusionList.Add(new());
+                AddListData(ref mutualExclusionList);
             }
 
             CheckAndSave();
@@ -981,12 +988,28 @@ namespace VRChatAvatarToolkit
             ornamentInfoList.Add(objInfo);
             WriteParameter();
         }
+
         //删除一件配饰
         private void DelOrnament(int index)
         {
             if (!EditorUtility.DisplayDialog("注意", "真的要删除这件配饰吗？", "确认", "取消"))
                 return;
             ornamentInfoList.RemoveAt(index);
+            WriteParameter();
+        }
+
+        private void AddListData<T>(ref List<T> listData, string name="新物品") where T : ObjInfo, new()
+        {
+            //foreach(var curItem in listData)
+            //{
+            //    curItem.animBool.target = false;
+            //}
+
+            var item = new T();
+            item.name = name;
+            item.animBool.valueChanged.AddListener(Repaint);
+            item.animBool.target = true;
+            listData.Add(item);
             WriteParameter();
         }
 
@@ -1058,6 +1081,35 @@ namespace VRChatAvatarToolkit
                         ornamentObjInfo.objectList.Add(transform.gameObject);
                 }
                 ornamentInfoList.Add(ornamentObjInfo);
+            }
+
+            // 加载互斥饰品组
+            mutualExclusionList = new List<MutualExclusionObjInfo>();
+            foreach (var mutualExclusion in parameter.mutualExclusionList)
+            {
+                var newMutualExclusion = new MutualExclusionObjInfo();
+                newMutualExclusion.name = mutualExclusion.name;
+                newMutualExclusion.image = mutualExclusion.menuImage;
+
+                foreach(var exclusion in mutualExclusion.mutualExclusions)
+                {
+                    var newExclusion = new ExclusionObjInfo();
+                    newExclusion.name = exclusion.name;
+                    newExclusion.image = exclusion.menuImage;
+
+                    foreach (var path in exclusion.itemPaths)
+                    {
+                        var transform = avatar.transform.Find(path);
+                        if (transform)
+                        {
+                            newExclusion.objectList.Add(transform.gameObject);
+                        }
+                    }
+
+                    newMutualExclusion.mutualExclusions.Add(newExclusion);
+                }
+
+                mutualExclusionList.Add(newMutualExclusion);
             }
         }
 
@@ -1186,6 +1238,36 @@ namespace VRChatAvatarToolkit
                 ornamentList.Add(ornamentInfo);
             }
             parameter.ornamentList = ornamentList;
+
+            // 写入互斥饰品组信息
+            var newMutualExList = new List<MutualExclusionInfo>();
+            foreach (var mutualExclusion in mutualExclusionList)
+            {
+                var newMutualExclusion = new MutualExclusionInfo();
+                newMutualExclusion.name = mutualExclusion.name;
+                newMutualExclusion.menuImage = mutualExclusion.image;
+
+                foreach (var exclusion in mutualExclusion.mutualExclusions)
+                {
+                    var newExclusion = new ExclusionInfo();
+                    newExclusion.name = exclusion.name;
+                    newExclusion.menuImage = exclusion.image;
+
+                    foreach (var obj in exclusion.objectList)
+                    {
+                        if (!obj)
+                            continue;
+
+                        var path = obj.transform.GetHierarchyPath();
+                        path = path.Substring(parentPath.Length);
+                        newExclusion.itemPaths.Add(path);
+                    }
+                    newMutualExclusion.mutualExclusions.Add(newExclusion);
+                }
+                newMutualExList.Add(newMutualExclusion);
+            }
+            parameter.mutualExclusionList = newMutualExList;
+
             EditorUtility.SetDirty(parameter);
         }
 

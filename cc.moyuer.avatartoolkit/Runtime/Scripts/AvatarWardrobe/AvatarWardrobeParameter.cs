@@ -70,7 +70,7 @@ namespace VRChatAvatarToolkit {
         {
             public string name;
             public Texture2D menuImage; //菜单图标
-            public List<ExclusionInfo> mutualExclusion;
+            public List<ExclusionInfo> mutualExclusions = new();
         }
     }
 }

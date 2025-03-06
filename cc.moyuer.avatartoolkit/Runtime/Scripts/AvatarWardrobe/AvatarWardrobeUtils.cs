@@ -59,7 +59,13 @@ namespace VRChatAvatarToolkit
         {
             public List<GameObject> objectList;
 
-            public ExclusionObjInfo(string _name = "新配饰")
+            public ExclusionObjInfo()
+            {
+                name = "新配饰";
+                objectList = new List<GameObject>();
+            }
+
+            public ExclusionObjInfo(string _name)
             {
                 name = _name;
                 objectList = new List<GameObject>();
@@ -69,10 +75,17 @@ namespace VRChatAvatarToolkit
         [System.Serializable]
         public class MutualExclusionObjInfo: ObjInfo
         {
-            public List<ExclusionObjInfo> mutualExclusions;
             public uint defaultIndex;
+            public List<ExclusionObjInfo> mutualExclusions;
 
-            public MutualExclusionObjInfo(string _name = "新互斥组")
+            public MutualExclusionObjInfo()
+            {
+                name = "新互斥组";
+                defaultIndex = 0;
+                mutualExclusions = new List<ExclusionObjInfo>();
+            }
+
+            public MutualExclusionObjInfo(string _name)
             {
                 name = _name;
                 defaultIndex = 0;
